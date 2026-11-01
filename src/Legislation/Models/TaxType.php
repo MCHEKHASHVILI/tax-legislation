@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Mchekhashvili\Countries\Models\Country;
 use Mchekhashvili\TaxLegislation\Database\Model;
+use Mchekhashvili\TaxLegislation\Revisions\RecordsRevisions;
 use Mchekhashvili\TaxLegislation\Engine\Tax;
 use Mchekhashvili\TaxLegislation\Legislation\TaxLevel;
 
@@ -42,6 +43,8 @@ use Mchekhashvili\TaxLegislation\Legislation\TaxLevel;
  */
 final class TaxType extends Model
 {
+    use RecordsRevisions;
+
     protected function baseTable(): string
     {
         return 'tax_types';

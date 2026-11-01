@@ -8,6 +8,13 @@ return [
     */
     'taxes' => null,
 
+    /*
+    | Follow the recorded law. Where a country's tax types are recorded, only taxes in force on the
+    | event's day run, an in-force tax no engine computes is reported as NotComputed, and an
+    | exemption the recorded law had not in force that day does not apply. False: run every tax.
+    */
+    'follow_law' => env('TAX_LEGISLATION_FOLLOW_LAW', true),
+
     /* Replace one tax's stages: 'vat' => [Stage::class, Stage::class => [Handler::class]]. */
     'pipelines' => [],
 

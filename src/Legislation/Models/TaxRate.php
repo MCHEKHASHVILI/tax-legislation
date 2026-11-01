@@ -7,6 +7,7 @@ namespace Mchekhashvili\TaxLegislation\Legislation\Models;
 use Mchekhashvili\Money\Laravel\MoneyCast;
 use Mchekhashvili\Money\Money;
 use Mchekhashvili\TaxLegislation\Database\Model;
+use Mchekhashvili\TaxLegislation\Revisions\RecordsRevisions;
 use Mchekhashvili\TaxLegislation\Legislation\Concerns\HasValidity;
 use Mchekhashvili\TaxLegislation\Rate;
 
@@ -25,6 +26,7 @@ use Mchekhashvili\TaxLegislation\Rate;
 final class TaxRate extends Model
 {
     use HasValidity;
+    use RecordsRevisions;
 
     protected function baseTable(): string
     {

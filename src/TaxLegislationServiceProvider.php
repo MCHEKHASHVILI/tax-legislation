@@ -14,7 +14,9 @@ use Mchekhashvili\TaxLegislation\Engine\TaxEngine;
 use Mchekhashvili\TaxLegislation\Engine\TaxRegistry;
 use Mchekhashvili\TaxLegislation\Events\TaxableEventAssessed;
 use Mchekhashvili\TaxLegislation\Ledger\NullLedger;
+use Mchekhashvili\TaxLegislation\Legislation\Law;
 use Mchekhashvili\TaxLegislation\Listeners\StoreAssessment;
+use Mchekhashvili\TaxLegislation\Revisions\Editor;
 
 final class TaxLegislationServiceProvider extends ServiceProvider
 {
@@ -23,6 +25,8 @@ final class TaxLegislationServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__ . '/../config/tax-legislation.php', 'tax-legislation');
 
         $this->app->singleton(TaxRegistry::class);
+        $this->app->scoped(Law::class);
+        $this->app->scoped(Editor::class);
         $this->app->bindIf(Ledger::class, NullLedger::class, shared: true);
 
         $this->app->scoped(TaxEngine::class, fn (Container $app) => new TaxEngine(

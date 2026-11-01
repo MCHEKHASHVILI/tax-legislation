@@ -7,6 +7,7 @@ namespace Mchekhashvili\TaxLegislation\Legislation\Models;
 use Mchekhashvili\Money\Laravel\MoneyCast;
 use Mchekhashvili\Money\Money;
 use Mchekhashvili\TaxLegislation\Database\Model;
+use Mchekhashvili\TaxLegislation\Revisions\RecordsRevisions;
 use Mchekhashvili\TaxLegislation\Legislation\Concerns\HasValidity;
 use Mchekhashvili\TaxLegislation\Legislation\ThresholdPeriod;
 
@@ -24,6 +25,7 @@ use Mchekhashvili\TaxLegislation\Legislation\ThresholdPeriod;
 final class Threshold extends Model
 {
     use HasValidity;
+    use RecordsRevisions;
 
     protected function baseTable(): string
     {

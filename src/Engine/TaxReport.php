@@ -34,15 +34,15 @@ final class TaxReport implements Arrayable, JsonSerializable
     /** @param iterable<Outcome> $outcomes */
     public function __construct(
         public readonly TaxableEvent $event,
-        iterable $outcomes = [],
         private readonly Currency|string $currency,
+        iterable $outcomes = [],
     ) {
         $this->outcomes = new Collection($outcomes)->keyBy(fn (Outcome $o) => $o->tax());
     }
 
     public function with(Outcome $outcome): self
     {
-        return new self($this->event, [...$this->outcomes->all(), $outcome->tax() => $outcome], $this->currency);
+        return new self($this->event, $this->currency, [...$this->outcomes->all(), $outcome->tax() => $outcome]);
     }
 
     public function for(string $tax): ?Outcome

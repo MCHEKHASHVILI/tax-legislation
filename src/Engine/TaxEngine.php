@@ -12,6 +12,9 @@ use Illuminate\Support\Collection;
 use Mchekhashvili\Money\Currency;
 use InvalidArgumentException;
 use Mchekhashvili\TaxLegislation\Contracts\Ledger;
+use Mchekhashvili\TaxLegislation\Engine\Outcome\NotComputed;
+use Mchekhashvili\TaxLegislation\Law\Citation;
+use Mchekhashvili\TaxLegislation\Legislation\Law;
 use Mchekhashvili\TaxLegislation\Contracts\TaxableEvent;
 use Mchekhashvili\TaxLegislation\Events\TaxableEventAssessed;
 use Mchekhashvili\TaxLegislation\Jobs\AssessTaxableEvent;
@@ -53,13 +56,53 @@ final readonly class TaxEngine
         return $report;
     }
 
-    /** What every tax says, without recording the event — a quote, a preview, a what-if. */
+    /**
+     * What every tax says, without recording the event — a quote, a preview, a what-if.
+     *
+     * Where a country's law is recorded, only taxes in force on the event's day run, and a tax in
+     * force that no engine computes is reported as NotComputed. Turn it off with
+     * config('tax-legislation.follow_law').
+     */
     public function assess(TaxableEvent $event): TaxReport
     {
-        return new Pipeline($this->container)
-            ->send(new TaxReport($event, [], $this->currency()))
-            ->through($this->taxes->values()->all())
+        [$taxes, $uncomputed] = $this->inForce($event);
+
+        $report = new Pipeline($this->container)
+            ->send(new TaxReport($event, $this->currency()))
+            ->through($taxes)
             ->thenReturn();
+
+        return array_reduce($uncomputed, fn (TaxReport $r, NotComputed $o) => $r->with($o), $report);
+    }
+
+    /** @return array{0: list<Tax>, 1: list<NotComputed>} */
+    private function inForce(TaxableEvent $event): array
+    {
+        if (!$this->container->make('config')->get('tax-legislation.follow_law', true)) {
+            return [$this->taxes->values()->all(), []];
+        }
+
+        $law = $this->container->make(Law::class);
+        $taxes = [];
+        $uncomputed = [];
+
+        foreach ($this->taxes->groupBy(fn (Tax $t) => $t->country()) as $country => $countryTaxes) {
+            $recorded = $law->taxesInForce((string) $country, $event->date());
+
+            foreach ($countryTaxes as $tax) {
+                if ($recorded === null || $recorded->has($tax->name())) {
+                    $taxes[] = $tax;
+                }
+            }
+
+            foreach ($recorded ?? [] as $code => $type) {
+                if ($type->engine === null || !class_exists($type->engine)) {
+                    $uncomputed[] = new NotComputed((string) $code, new Citation(preg_replace('/^Art\.\s*/', '', (string) $type->legal_basis), $type->nameIn('en')));
+                }
+            }
+        }
+
+        return [$taxes, $uncomputed];
     }
 
     /** Process on the queue. */

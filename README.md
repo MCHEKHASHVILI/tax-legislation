@@ -3,7 +3,8 @@
 Tax law changes. This package keeps its history, per country, and runs each country's taxes against the law as it stood on the day of the event.
 
 - **Legislation over time.** Legal acts, the taxes a country has had, and the rates, thresholds, exemptions and tables of its law. Each value carries the dates it was in force and the act that set it.
-- **A country-neutral engine.** Each country's taxes run as Laravel pipelines, with typed outcomes (taxable, levied per unit, exempt, exempt with credit, not taxable, unresolved). Reports are stored, and events and a queued job are included.
+- **A country-neutral engine** that follows the recorded law. Each country's taxes run as Laravel pipelines, with typed outcomes (taxable, levied per unit, exempt, exempt with credit, not taxable, not computed, unresolved). A tax only runs within its period, and an exemption only applies while it was in force. Reports are stored, and events and a queued job are included.
+- **Entered through forms, by people now and agents later.** Validated actions keep the law consistent, and a revision log records who changed what, from which source, and why.
 
 Country packages build on it: [`mchekhashvili/georgian-tax`](https://github.com/MCHEKHASHVILI/georgian-tax) is Georgia's law. Countries come from [`mchekhashvili/countries`](https://github.com/MCHEKHASHVILI/countries), money from [`mchekhashvili/money`](https://github.com/MCHEKHASHVILI/money).
 
@@ -32,6 +33,7 @@ php artisan countries:sync
 | Model | One row is |
 |---|---|
 | `LegalAct` | An act that made or changed tax law: a code, an amending law, a resolution, a municipal act. It can amend another act. |
+| `Revision` | One edit to any of these records: who, what, why, from which source |
 | `TaxType` | One tax in one country for one period: in force from a day, abolished on another, possibly replacing an earlier tax. |
 | `TaxRate` | A percentage, an amount per unit, or both. |
 | `Threshold` | An amount the law draws a line at, and what it is measured over (a transaction, a calendar year, a rolling 12 months…). |
@@ -61,7 +63,55 @@ TaxType::query()->ofCountry('GE')->inForceOn('2007-06-01')->get();
 $law->ratesSet; $law->thresholdsSet; $law->taxTypesAbolished;   // everything one act changed
 ```
 
-`EloquentRateTable` hands rates to the engine as they stood on the event's day, so an amendment entered in the database applies from its date with no code change.
+`EloquentRateTable`, `EloquentThresholdTable` and `EloquentTableSource` hand rates, thresholds and tables to the engine as they stood on the event's day. An amendment entered in the database applies from its date with no code change.
+
+## Entering the law
+
+Amendments come in through forms: a person now, an agent later. Each form posts to an action. The action validates like a form request (a `ValidationException` carries field errors back), saves in a transaction, and logs a revision.
+
+| Action | Does | Guards |
+|---|---|---|
+| `RecordLegalAct` | Records an act | Known country and kind; dates in order; an amended act of the same country |
+| `RecordTaxType` | Records a tax for a period | No overlap with another period of the same tax; acts and predecessors of the same country; `engine` is a `Tax` class |
+| `AbolishTaxType` | Abolishes a tax from a day | After its start; the act is of its country |
+| `AmendLaw` | Changes a rate, threshold, exemption or table row from a day | Every amendment cites its act, of the same country; the day falls in the tax's period; ISO currencies; rate in 0–100% |
+| `RepealLaw` | Ends a value from a day | After it began; the act is of its country |
+
+```php
+public function store(Request $request, AmendLaw $amend)
+{
+    $rate = $amend->handle(ValueKind::Rate, $request->all());   // tax_type_id, key, from, legal_act_id, percent, reason, source
+    return redirect()->route('rates.show', $rate);
+}
+```
+
+The rules are public (`$action->rules()`), so a `FormRequest` can reuse them. Authorization belongs to your app: gates and policies on these models.
+
+**Revisions.** Every create, update and delete of a legislation record writes a `Revision`: the record, the old and new values, the editor, the `reason` and the `source` the form gave. This is the editing history, separate from the legal history. Periods record when the law applied a value; revisions record who entered it, when and from what.
+
+```php
+$rate->revisions;                       // newest first
+$revision->who();                       // 'Nino', or 'agent:matsne-reader'
+$revision->changes;                     // ['old' => [...], 'new' => [...]]
+```
+
+The editor is the logged-in user. An agent or a job names itself:
+
+```php
+app(Editor::class)->as($agentModel, 'Read from Matsne', source: $url)->run(fn () => $amend->handle(...));
+app(Editor::class)->as('agent:matsne-reader')->run(...);
+```
+
+## Following the law
+
+Where a country's tax types are recorded, the engine reads the law as it stood on the event's day:
+
+- a tax runs only within its period;
+- a tax in force that no engine computes (no `engine` class) is reported as `NotComputed`, so it isn't silently missed;
+- an exemption answer stands only if the recorded law had that exemption in force. Its conditions stay in code, and articles the law doesn't list are not contradicted;
+- rates, thresholds and tables come from `EloquentRateTable`, `EloquentThresholdTable` and `EloquentTableSource`, which a country package binds.
+
+A country with nothing recorded runs as before. `config('tax-legislation.follow_law')` turns all of this off.
 
 ## Engine
 
@@ -126,7 +176,7 @@ The engine depends on a few contracts, which a country implements:
 composer test
 ```
 
-The engine tests use an invented Armenian sales tax, and the legislation tests use invented acts and dates. They exercise the package; they are not legal history.
+The engine tests use an invented Armenian sales tax, and the legislation, form and following-the-law tests use invented acts and dates. They exercise the package; they are not legal history.
 
 ## License
 

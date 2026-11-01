@@ -6,6 +6,7 @@ namespace Mchekhashvili\TaxLegislation\Legislation\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Mchekhashvili\TaxLegislation\Database\Model;
+use Mchekhashvili\TaxLegislation\Revisions\RecordsRevisions;
 use Mchekhashvili\TaxLegislation\Legislation\Concerns\HasValidity;
 
 /**
@@ -22,6 +23,7 @@ use Mchekhashvili\TaxLegislation\Legislation\Concerns\HasValidity;
 final class TableEntry extends Model
 {
     use HasValidity;
+    use RecordsRevisions;
 
     protected function baseTable(): string
     {

@@ -125,6 +125,19 @@ return new class extends Migration
             $table->index(['tax_type_id', 'table', 'key']);
         });
 
+        // Who entered or changed each record, what changed, and why — the editing history.
+        Schema::create($this->t('legislation_revisions'), function (Blueprint $table) {
+            $table->id();
+            $table->morphs('subject');
+            $table->string('action', 10);
+            $table->json('changes');
+            $table->nullableMorphs('causer');
+            $table->string('causer_label')->nullable();
+            $table->text('reason')->nullable();
+            $table->string('source')->nullable();
+            $table->timestamp('created_at')->useCurrent();
+        });
+
         Schema::create($this->t('tax_assessments'), function (Blueprint $table) {
             $table->id();
             $table->string('event_type');
@@ -162,7 +175,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        foreach (['tax_assessment_outcomes', 'tax_assessments', 'tax_table_entries', 'tax_exemptions', 'tax_thresholds', 'tax_rates', 'tax_types', 'legal_acts'] as $name) {
+        foreach (['tax_assessment_outcomes', 'tax_assessments', 'legislation_revisions', 'tax_table_entries', 'tax_exemptions', 'tax_thresholds', 'tax_rates', 'tax_types', 'legal_acts'] as $name) {
             Schema::dropIfExists($this->t($name));
         }
     }

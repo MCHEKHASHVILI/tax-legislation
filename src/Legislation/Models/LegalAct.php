@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Mchekhashvili\Countries\Models\Country;
 use Mchekhashvili\TaxLegislation\Database\Model;
+use Mchekhashvili\TaxLegislation\Revisions\RecordsRevisions;
 use Mchekhashvili\TaxLegislation\Legislation\ActKind;
 
 /**
@@ -34,6 +35,8 @@ use Mchekhashvili\TaxLegislation\Legislation\ActKind;
  */
 final class LegalAct extends Model
 {
+    use RecordsRevisions;
+
     protected function baseTable(): string
     {
         return 'legal_acts';

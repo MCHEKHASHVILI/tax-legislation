@@ -17,8 +17,19 @@ use Mchekhashvili\TaxLegislation\Engine\Outcome\Outcome;
  */
 abstract class FirstMatch
 {
+    /** Decides whether an answer stands — e.g. that its exemption was in force. */
+    private ?Closure $guard = null;
+
     /** @param list<THandler> $handlers */
     public function __construct(protected readonly array $handlers) {}
+
+    /** @param Closure(Outcome): bool $guard */
+    public function guardedBy(Closure $guard): static
+    {
+        $this->guard = $guard;
+
+        return $this;
+    }
 
     /**
      * @param THandler $handler
@@ -33,7 +44,7 @@ abstract class FirstMatch
     public function handle(object $subject, Closure $next): Outcome
     {
         foreach ($this->handlers as $handler) {
-            if (($outcome = $this->ask($handler, $subject)) !== null) {
+            if (($outcome = $this->ask($handler, $subject)) !== null && ($this->guard === null || ($this->guard)($outcome))) {
                 return $outcome;
             }
         }
