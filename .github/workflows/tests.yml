@@ -1,0 +1,31 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - laravel: '12.*'
+            testbench: '10.*'
+          - laravel: '13.*'
+            testbench: '11.*'
+    name: PHP 8.4 · Laravel ${{ matrix.laravel }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: bcmath, pdo_sqlite
+          coverage: none
+      # not on Packagist yet
+      - run: composer config repositories.money vcs https://github.com/MCHEKHASHVILI/money
+      - run: composer config repositories.countries vcs https://github.com/MCHEKHASHVILI/countries
+      - run: composer require "illuminate/support:${{ matrix.laravel }}" "orchestra/testbench:${{ matrix.testbench }}" --dev --no-update
+      - run: composer update --no-interaction --no-progress --with-all-dependencies
+      - run: composer test
