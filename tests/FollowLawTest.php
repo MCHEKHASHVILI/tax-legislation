@@ -19,7 +19,7 @@ use Mchekhashvili\TaxLegislation\Rates\ConfigRateTable;
 use Mchekhashvili\TaxLegislation\Rates\ConfigThresholdTable;
 use Mchekhashvili\TaxLegislation\Rates\EloquentTableSource;
 use Mchekhashvili\TaxLegislation\Rates\EloquentThresholdTable;
-use Mchekhashvili\TaxLegislation\Rates\RateTable;
+use Mchekhashvili\TaxLegislation\Rates\CountryTables;
 use Mchekhashvili\TaxLegislation\Tests\Fixtures\Sale;
 use Mchekhashvili\TaxLegislation\Tests\Fixtures\SalesTax;
 use Mchekhashvili\TaxLegislation\Tests\Fixtures\Shop;
@@ -31,7 +31,7 @@ use Mchekhashvili\TaxLegislation\Tests\Fixtures\Shop;
 beforeEach(function () {
     $this->seed(CountrySeeder::class);
     app(TaxRegistry::class)->register(SalesTax::class);
-    app()->instance(RateTable::class, new ConfigRateTable(['1' => ['2000-01-01' => 18]]));
+    app(CountryTables::class)->register('AM', rates: new ConfigRateTable(['1' => ['2000-01-01' => 18]]));
 
     $this->sale = fn (string $on, bool $food = false) => new Sale(new Shop('shop'), Money::AMD(1000), new DateTimeImmutable($on), $food);
     $this->type = fn (string $code, ?string $from, ?string $until = null, ?string $engine = null) => TaxType::query()->create([

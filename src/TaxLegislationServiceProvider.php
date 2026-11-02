@@ -16,6 +16,10 @@ use Mchekhashvili\TaxLegislation\Events\TaxableEventAssessed;
 use Mchekhashvili\TaxLegislation\Ledger\NullLedger;
 use Mchekhashvili\TaxLegislation\Legislation\Law;
 use Mchekhashvili\TaxLegislation\Listeners\StoreAssessment;
+use Mchekhashvili\TaxLegislation\Rates\CountryTables;
+use Mchekhashvili\TaxLegislation\Rates\RateTable;
+use Mchekhashvili\TaxLegislation\Rates\TableSource;
+use Mchekhashvili\TaxLegislation\Rates\ThresholdTable;
 use Mchekhashvili\TaxLegislation\Revisions\Editor;
 
 final class TaxLegislationServiceProvider extends ServiceProvider
@@ -25,6 +29,13 @@ final class TaxLegislationServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__ . '/../config/tax-legislation.php', 'tax-legislation');
 
         $this->app->singleton(TaxRegistry::class);
+
+        // Rates, thresholds and tables per country; a type-hint resolves to the assessing tax's country.
+        $this->app->singleton(CountryTables::class);
+        foreach ([RateTable::class, ThresholdTable::class, TableSource::class] as $contract) {
+            $this->app->bindIf($contract, fn (Container $app) => $app->make(CountryTables::class)->forCurrent($contract));
+        }
+
         $this->app->scoped(Law::class);
         $this->app->scoped(Editor::class);
         $this->app->bindIf(Ledger::class, NullLedger::class, shared: true);

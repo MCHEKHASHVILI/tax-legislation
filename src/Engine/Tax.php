@@ -16,6 +16,10 @@ use Mchekhashvili\TaxLegislation\Engine\Outcome\ExemptWithCredit;
 use Mchekhashvili\TaxLegislation\Engine\Outcome\Outcome;
 use Mchekhashvili\TaxLegislation\Engine\Stage\FirstMatch;
 use Mchekhashvili\TaxLegislation\Legislation\Law;
+use Mchekhashvili\TaxLegislation\Rates\CountryTables;
+use Mchekhashvili\TaxLegislation\Rates\RateTable;
+use Mchekhashvili\TaxLegislation\Rates\TableSource;
+use Mchekhashvili\TaxLegislation\Rates\ThresholdTable;
 
 /**
  * One tax of one country's law: Georgia's VAT, Georgia's income tax, another country's sales tax.
@@ -31,6 +35,10 @@ use Mchekhashvili\TaxLegislation\Legislation\Law;
  *
  * Every class is built by the container. An app can replace a tax's stages through
  * config("{configKey()}.pipelines.{name()}").
+ *
+ * The law's numbers are the country's own: rateTable(), thresholdTable() and tableSource() read
+ * CountryTables for country(), and a stage or handler that type-hints RateTable, ThresholdTable or
+ * TableSource gets this tax's country's while it assesses.
  */
 abstract class Tax
 {
@@ -66,12 +74,37 @@ abstract class Tax
             return $this->assess($event->original())->reversed($event->share());
         }
 
-        $standing = $this->exemptionsInForce($event);
+        return $this->tables()->within($this->country(), function () use ($event, $report): Outcome {
+            $standing = $this->exemptionsInForce($event);
 
-        return new Pipeline($this->container)
-            ->send($this->subject($event, $report))
-            ->through(array_map(fn (object $pipe) => $this->guarded($pipe, $standing), $this->pipes()))
-            ->then(fn () => throw new LogicException(static::class . ': no stage answered — the last stage must always answer.'));
+            return new Pipeline($this->container)
+                ->send($this->subject($event, $report))
+                ->through(array_map(fn (object $pipe) => $this->guarded($pipe, $standing), $this->pipes()))
+                ->then(fn () => throw new LogicException(static::class . ': no stage answered — the last stage must always answer.'));
+        });
+    }
+
+    /** This country's rates, as the law set them over time. */
+    protected function rateTable(): RateTable
+    {
+        return $this->tables()->rates($this->country());
+    }
+
+    /** This country's thresholds. */
+    protected function thresholdTable(): ThresholdTable
+    {
+        return $this->tables()->thresholds($this->country());
+    }
+
+    /** This country's tables of the law. */
+    protected function tableSource(): TableSource
+    {
+        return $this->tables()->tables($this->country());
+    }
+
+    private function tables(): CountryTables
+    {
+        return $this->container->make(CountryTables::class);
     }
 
     /** As a pipe of the engine. */

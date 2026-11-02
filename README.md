@@ -109,7 +109,7 @@ Where a country's tax types are recorded, the engine reads the law as it stood o
 - a tax runs only within its period;
 - a tax in force that no engine computes (no `engine` class) is reported as `NotComputed`, so it isn't silently missed;
 - an exemption answer stands only if the recorded law had that exemption in force. Its conditions stay in code, and articles the law doesn't list are not contradicted;
-- rates, thresholds and tables come from `EloquentRateTable`, `EloquentThresholdTable` and `EloquentTableSource`, which a country package binds.
+- rates, thresholds and tables come from the country's own sources in `CountryTables` (below), by default `EloquentRateTable`, `EloquentThresholdTable` and `EloquentTableSource`.
 
 A country with nothing recorded runs as before. `config('tax-legislation.follow_law')` turns all of this off.
 
@@ -142,6 +142,24 @@ final class Vat extends Tax
 // in the country's service provider
 $this->callAfterResolving(TaxRegistry::class, fn ($r) => $r->register(ImportTax::class, Excise::class, Vat::class));
 ```
+
+**Each country's numbers.** Rates, thresholds and tables are kept per country in `Rates\CountryTables`, so two countries' packages in one app never read each other's, even where their article keys are the same. A country registers its sources; one it doesn't register is read from the history tables (`EloquentRateTable`, `EloquentThresholdTable`, `EloquentTableSource` for that country). Each source is built once per request.
+
+```php
+// in the country's service provider
+$this->callAfterResolving(CountryTables::class, fn (CountryTables $t) => $t->register('GE',
+    rates: fn () => ConfigRateTable::standard($path),
+    thresholds: fn () => new EloquentThresholdTable('GE'),
+));
+
+// in a tax
+new Supply($event, $this->rateTable(), $this->thresholdTable());   // also tableSource()
+
+// anywhere else
+app(CountryTables::class)->rates('GE')->rate('166', $day);
+```
+
+While a tax assesses, a stage or handler that type-hints `RateTable`, `ThresholdTable` or `TableSource` gets that tax's country's. Outside a tax the type-hint has no country and throws; ask `CountryTables` for the one you mean.
 
 Each stage has a `handle($subject, $next)` method, like HTTP middleware. `Engine\Stage\FirstMatch` is the stage that asks a list of rules or exemptions and returns the first answer. Stages and handlers are built by the container. An app can replace a tax's stages through `config('<country-config>.pipelines.<tax>')`.
 

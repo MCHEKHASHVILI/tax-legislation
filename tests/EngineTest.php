@@ -16,7 +16,7 @@ use Mchekhashvili\TaxLegislation\Events\TaxableEventAssessed;
 use Mchekhashvili\TaxLegislation\Facades\Taxes;
 use Mchekhashvili\TaxLegislation\Jobs\AssessTaxableEvent;
 use Mchekhashvili\TaxLegislation\Rates\ConfigRateTable;
-use Mchekhashvili\TaxLegislation\Rates\RateTable;
+use Mchekhashvili\TaxLegislation\Rates\CountryTables;
 use Mchekhashvili\TaxLegislation\Tests\Fixtures\Cancellation;
 use Mchekhashvili\TaxLegislation\Tests\Fixtures\Sale;
 use Mchekhashvili\TaxLegislation\Tests\Fixtures\SalesTax;
@@ -35,7 +35,7 @@ final class ListLedger implements Ledger
 
 beforeEach(function () {
     app(TaxRegistry::class)->register(SalesTax::class);
-    app()->instance(RateTable::class, new ConfigRateTable(['1' => ['2000-01-01' => 20, '2024-01-01' => 18]]));
+    app(CountryTables::class)->register('AM', rates: new ConfigRateTable(['1' => ['2000-01-01' => 20, '2024-01-01' => 18]]));
     app()->instance(Ledger::class, $this->ledger = new ListLedger());
 
     $this->sale = fn (int $amd, string $on = '2026-10-30', bool $food = false) => new Sale(new Shop('shop'), Money::AMD($amd), new DateTimeImmutable($on), $food);
