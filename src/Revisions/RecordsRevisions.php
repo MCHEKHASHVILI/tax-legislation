@@ -45,6 +45,7 @@ trait RecordsRevisions
             'causer_label' => is_string($causer) ? $causer : null,
             'reason' => $editor->reason(),
             'source' => $editor->source(),
+            'draft_id' => $editor->draft()?->getKey(),
         ]);
         $revision->subject()->associate($model);
 

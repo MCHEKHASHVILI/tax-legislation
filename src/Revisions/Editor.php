@@ -8,6 +8,7 @@ use Closure;
 use Illuminate\Contracts\Auth\Factory as Auth;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Model;
+use Mchekhashvili\TaxLegislation\Drafts\Draft;
 
 /**
  * Who is changing the law right now, and why. Revisions read it when a record is saved.
@@ -22,6 +23,7 @@ final class Editor
     private Model|string|null $causer = null;
     private ?string $reason = null;
     private ?string $source = null;
+    private ?Draft $draft = null;
 
     public function __construct(private readonly Container $container) {}
 
@@ -42,6 +44,29 @@ final class Editor
         } finally {
             [$this->causer, $this->reason, $this->source] = $before;
         }
+    }
+
+    /**
+     * Applies an approved draft: the changes made inside are logged with the draft they came from.
+     *
+     * @template T @param Closure(): T $work @return T
+     */
+    public function applying(Draft $draft, Closure $work): mixed
+    {
+        $before = $this->draft;
+        $this->draft = $draft;
+
+        try {
+            return $this->within(null, $draft->reason, $draft->source, $work);
+        } finally {
+            $this->draft = $before;
+        }
+    }
+
+    /** The approved draft being applied, if any. */
+    public function draft(): ?Draft
+    {
+        return $this->draft;
     }
 
     public function causer(): Model|string|null

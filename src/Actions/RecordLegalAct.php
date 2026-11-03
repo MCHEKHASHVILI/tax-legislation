@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Mchekhashvili\TaxLegislation\Actions;
 
 use Illuminate\Validation\Rule;
+use Mchekhashvili\TaxLegislation\Drafts\Draft;
 use Mchekhashvili\TaxLegislation\Legislation\ActKind;
 use Mchekhashvili\TaxLegislation\Legislation\Models\LegalAct;
 
 /**
- * Records a legal act: a code, an amending law, a resolution, a municipal act.
+ * Records a legal act: a code, an amending law, a resolution, a municipal act. A Draft while
+ * approval is on.
  *
  *     app(RecordLegalAct::class)->handle([
  *         'country' => 'GE', 'kind' => 'law', 'number' => '1234', 'title' => 'Law of Georgia',
@@ -36,13 +38,21 @@ final class RecordLegalAct extends Action
         ];
     }
 
-    public function handle(array $input): LegalAct
+    public function handle(array $input): LegalAct|Draft
     {
-        $valid = $this->validate($input);
+        return $this->submit($input);
+    }
 
-        return $this->save($valid, fn () => LegalAct::query()->create([
+    protected function apply(array $valid): LegalAct
+    {
+        return LegalAct::query()->create([
             ...array_diff_key($valid, array_flip(['country', 'reason', 'source'])),
-            'country_id' => $this->countryId($valid['country']),
-        ]));
+            'country_id' => $this->countryOf($valid),
+        ]);
+    }
+
+    protected function countryOf(array $valid): ?int
+    {
+        return $this->countryId($valid['country']);
     }
 }

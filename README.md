@@ -34,6 +34,7 @@ php artisan countries:sync
 |---|---|
 | `LegalAct` | An act that made or changed tax law: a code, an amending law, a resolution, a municipal act. It can amend another act. |
 | `Revision` | One edit to any of these records: who, what, why, from which source |
+| `Draft` | A submitted change waiting for approval: pending, approved (applied) or rejected, with who drafted and decided it and why |
 | `TaxType` | One tax in one country for one period: in force from a day, abolished on another, possibly replacing an earlier tax. |
 | `TaxRate` | A percentage, an amount per unit, or both. |
 | `Threshold` | An amount the law draws a line at, and what it is measured over (a transaction, a calendar year, a rolling 12 months…). |
@@ -67,7 +68,7 @@ $law->ratesSet; $law->thresholdsSet; $law->taxTypesAbolished;   // everything on
 
 ## Entering the law
 
-Amendments come in through forms: a person now, an agent later. Each form posts to an action. The action validates like a form request (a `ValidationException` carries field errors back), saves in a transaction, and logs a revision.
+Amendments come in through forms: a person now, an agent later. Each form posts to an action. The action validates like a form request (a `ValidationException` carries field errors back) and saves the change as a draft for approval, or, with approval off, applies it in a transaction. Either way it logs a revision.
 
 | Action | Does | Guards |
 |---|---|---|
@@ -76,18 +77,42 @@ Amendments come in through forms: a person now, an agent later. Each form posts 
 | `AbolishTaxType` | Abolishes a tax from a day | After its start; the act is of its country |
 | `AmendLaw` | Changes a rate, threshold, exemption or table row from a day | Every amendment cites its act, of the same country; the day falls in the tax's period; ISO currencies; rate in 0–100% |
 | `RepealLaw` | Ends a value from a day | After it began; the act is of its country |
+| `ApproveDraft` | Applies a pending draft | The app's gate allows the editor; the draft is still pending; the change still passes its guards |
+| `RejectDraft` | Rejects a pending draft, with a reason | The app's gate allows the editor; the draft is still pending |
 
 ```php
 public function store(Request $request, AmendLaw $amend)
 {
-    $rate = $amend->handle(ValueKind::Rate, $request->all());   // tax_type_id, key, from, legal_act_id, percent, reason, source
-    return redirect()->route('rates.show', $rate);
+    $draft = $amend->handle(ValueKind::Rate, $request->all());   // tax_type_id, key, from, legal_act_id, percent, reason, source
+    return redirect()->route('drafts.show', $draft);
 }
 ```
 
-The rules are public (`$action->rules()`), so a `FormRequest` can reuse them. Authorization belongs to your app: gates and policies on these models.
+The rules are public (`$action->rules()`), so a `FormRequest` can reuse them.
 
-**Revisions.** Every create, update and delete of a legislation record writes a `Revision`: the record, the old and new values, the editor, the `reason` and the `source` the form gave. This is the editing history, separate from the legal history. Periods record when the law applied a value; revisions record who entered it, when and from what.
+**Drafts and approval.** With `tax-legislation.approval.required` on (the default), an action saves a pending `Draft` and returns it. A draft has no legal effect: it lives in its own table, so the engine, `inForceOn()` and `Law` never see it.
+
+```php
+$rate = app(ApproveDraft::class)->handle($draft, ['reason' => 'Checked against Matsne']);   // the TaxRate, now in force from its day
+app(RejectDraft::class)->handle($draft, ['reason' => 'The law was not adopted']);            // kept, never applied
+
+Draft::query()->pending()->ofCountry('GE')->get();
+$draft->drafter(); $draft->decider(); $draft->decision_note; $draft->result;
+```
+
+Approval applies the change in one transaction, against the law as it stands at that moment. The value in force is closed and the new one opened then, and the guards run again: a draft overtaken by another change (an overlapping period, a tax since abolished) fails with field errors and stays pending. A draft is decided once.
+
+Who may approve is your app's decision. `ApproveDraft` and `RejectDraft` check the gate `tax-legislation.approval.gate` names (`approve-legislation`) for the editor, given the draft. The package defines no such gate, so nobody can decide until you do:
+
+```php
+Gate::define('approve-legislation', fn (User $user, Draft $draft) => $user->can_approve && !$draft->draftedBy?->is($user));
+```
+
+Set the gate to `null` to authorize in your routes instead. `DraftSubmitted` and `DraftDecided` events fire for notifications.
+
+Set `approval.required` to false (`TAX_LEGISLATION_APPROVAL=false`) for changes to take effect at once, in tests for example. Seeders and imports write the models directly, or call `$action->directly()->handle(...)`, and take effect at once. A draft can cite only acts and taxes already recorded, so approve a new act before drafting amendments that cite it.
+
+**Revisions.** Every create, update and delete of a legislation record writes a `Revision`: the record, the old and new values, the editor, the `reason` and the `source` the form gave. A change applied from a draft names the approver as editor and links the draft (`$revision->draft`), which names the drafter; the draft's own revisions log its submission and decision. This is the editing history, separate from the legal history. Periods record when the law applied a value; revisions record who entered it, when and from what.
 
 ```php
 $rate->revisions;                       // newest first

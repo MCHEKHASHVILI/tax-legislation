@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Mchekhashvili\TaxLegislation\Revisions;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Mchekhashvili\TaxLegislation\Database\Model;
+use Mchekhashvili\TaxLegislation\Drafts\Draft;
 
 /**
  * One change to a legislation record, as entered: who made it, what changed, and why.
@@ -24,6 +26,7 @@ use Mchekhashvili\TaxLegislation\Database\Model;
  * @property ?string $causer_label    who, when not a model: 'seeder', 'agent:matsne-reader'
  * @property ?string $reason
  * @property ?string $source          where the change came from: a URL, a form, a document
+ * @property ?int $draft_id           the approved draft the change applied; its drafter and approver
  * @property \Carbon\CarbonImmutable $created_at
  */
 final class Revision extends Model
@@ -50,6 +53,12 @@ final class Revision extends Model
     public function causer(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /** @return BelongsTo<Draft, $this> the approved draft this change applied, if it came through one */
+    public function draft(): BelongsTo
+    {
+        return $this->belongsTo(Draft::class);
     }
 
     /** Who, for display: the model's name or id, or the label. */

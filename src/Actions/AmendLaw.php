@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Mchekhashvili\TaxLegislation\Actions;
 
 use Closure;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
+use Mchekhashvili\TaxLegislation\Drafts\Draft;
 use Mchekhashvili\Money\Currency;
 use Mchekhashvili\Money\Money;
 use Mchekhashvili\TaxLegislation\Legislation\Models\LegalAct;
@@ -24,6 +26,9 @@ use Mchekhashvili\TaxLegislation\Legislation\ValueKind;
  *     ]);
  *
  * Money comes in as a decimal and a currency: 'amount' => '100000', 'currency' => 'GEL'.
+ *
+ * While approval is on, handle() returns a Draft; the row in force is closed and the new one opened
+ * only when it is approved.
  */
 final class AmendLaw extends Action
 {
@@ -72,7 +77,12 @@ final class AmendLaw extends Action
     public function handle(ValueKind $kind, array $input): object
     {
         $this->kind = $kind;
-        $valid = $this->validate($input);
+
+        return $this->submit($input);
+    }
+
+    protected function apply(array $valid): Model
+    {
         $tax = TaxType::query()->findOrFail($valid['tax_type_id']);
         $act = LegalAct::query()->findOrFail($valid['legal_act_id']);
 
@@ -82,9 +92,24 @@ final class AmendLaw extends Action
             $values['amount'] = Money::of((string) $values['amount'], $valid['currency']);
         }
 
-        $model = $kind->model();
+        $model = $this->kind->model();
 
-        return $this->save($valid, fn () => $model::amend($tax, $valid['key'], $values, from: $valid['from'], by: $act, article: $valid['article'] ?? null));
+        return $model::amend($tax, $valid['key'], $values, from: $valid['from'], by: $act, article: $valid['article'] ?? null);
+    }
+
+    protected function countryOf(array $valid): ?int
+    {
+        return TaxType::query()->whereKey($valid['tax_type_id'])->value('country_id');
+    }
+
+    protected function kind(): ?ValueKind
+    {
+        return $this->kind;
+    }
+
+    protected function restore(Draft $draft): void
+    {
+        $this->kind = $draft->kind;
     }
 
     /** A rule: the day must fall within the tax's own period. */
