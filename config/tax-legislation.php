@@ -30,6 +30,19 @@ return [
         'gate' => 'approve-legislation',
     ],
 
+    /*
+    | The JSON API (Mchekhashvili\TaxLegislation\Http\Routes): read the law on a day and its history,
+    | submit changes through the actions, approve or reject drafts, read the revision log. Off by
+    | default. Authentication is your middleware's job — add your guard here ('auth:sanctum'), or
+    | leave this off and call Routes::register() inside your own route group.
+    */
+    'api' => [
+        'enabled' => env('TAX_LEGISLATION_API', false),
+        'prefix' => env('TAX_LEGISLATION_API_PREFIX', 'api/tax-legislation'),
+        'name' => 'tax-legislation.',
+        'middleware' => ['api'],
+    ],
+
     /* Replace one tax's stages: 'vat' => [Stage::class, Stage::class => [Handler::class]]. */
     'pipelines' => [],
 

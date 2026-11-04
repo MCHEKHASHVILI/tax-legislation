@@ -127,6 +127,40 @@ app(Editor::class)->as($agentModel, 'Read from Matsne', source: $url)->run(fn ()
 app(Editor::class)->as('agent:matsne-reader')->run(...);
 ```
 
+## JSON API
+
+Optional routes over all of this, for a form, an agent or a frontend. Switch them on with `TAX_LEGISLATION_API=true`. They sit under `tax-legislation.api.prefix` (`api/tax-legislation`), are named `tax-legislation.*` and run behind `tax-legislation.api.middleware` (`['api']`). Authentication is your middleware: add your guard there, for example `['api', 'auth:sanctum']`. Or leave the switch off and place the routes yourself:
+
+```php
+Route::middleware(['api', 'auth:sanctum'])->prefix('law')->group(fn () => \Mchekhashvili\TaxLegislation\Http\Routes::register());
+```
+
+Every answer is JSON, errors too. A country is any ISO 3166-1 code (`GE`, `GEO`, `268`). `{kind}` is `rate`, `threshold`, `exemption` or `table`. A day is `?on=YYYY-MM-DD` and defaults to today. Lists of acts, drafts and revisions are paginated (`?per_page=`, at most 100).
+
+| Method and path | What |
+|---|---|
+| `GET countries` | Countries with law recorded, with counts; `?all=1` for every country |
+| `GET countries/{country}` | One country |
+| `GET countries/{country}/legal-acts` | Its acts, newest first; `?kind=law` |
+| `GET countries/{country}/tax-types` | Every recorded period of its taxes; `?on=` for those in force that day |
+| `GET legal-acts/{id}` | An act, with what it did: taxes introduced and abolished, values set, acts amending it |
+| `GET tax-types/{id}` | A tax |
+| `GET tax-types/{id}/law?on=` | Its rates, thresholds, exemptions and table rows in force on the day |
+| `GET tax-types/{id}/history/{kind}/{key}` | Every period of one value, oldest first; a table row needs `?table=` |
+| `GET values/{kind}/{id}` | One value |
+| `POST legal-acts` | `RecordLegalAct` |
+| `POST tax-types` | `RecordTaxType` |
+| `POST tax-types/{id}/abolish` | `AbolishTaxType`: `on`, `legal_act_id` |
+| `POST amendments` | `AmendLaw`: `kind` and the amendment's fields |
+| `POST values/{kind}/{id}/repeal` | `RepealLaw`: `on`, `legal_act_id` |
+| `GET drafts` | Pending drafts, oldest first; `?status=approved\|rejected\|all`, `?country=` |
+| `GET drafts/{id}` | One draft: its action, payload, drafter, decision, and the `result` approval created |
+| `POST drafts/{id}/approve` | `ApproveDraft`, optional `reason` |
+| `POST drafts/{id}/reject` | `RejectDraft`, `reason` required |
+| `GET revisions` | The revision log, newest first; `?subject=rate&subject_id=7`, `?draft_id=3` |
+
+A form posts the same fields its action takes, `reason` and `source` included. While approval is on, it answers **202** with the draft; with approval off, **201** with the record. Field errors answer **422** with `errors`, as Laravel's form requests do. So does a draft that was already decided (`errors.draft`) and a draft the law has since overtaken, which stays pending. When the approval gate refuses, the answer is **403**. Money is `{"amount": "100000.00", "currency": "GEL"}`. Records point to each other as `{"type": "rate", "id": 7}`.
+
 ## Following the law
 
 Where a country's tax types are recorded, the engine reads the law as it stood on the event's day:
@@ -211,7 +245,7 @@ The engine depends on a few contracts, which a country implements:
 
 ## Config
 
-`php artisan vendor:publish --tag=tax-legislation-config` covers the tax list, pipeline overrides, whether reports are stored, the database connection and table prefix, and the queue.
+`php artisan vendor:publish --tag=tax-legislation-config` covers the tax list, the JSON API, pipeline overrides, whether reports are stored, the database connection and table prefix, and the queue.
 
 ## Tests
 

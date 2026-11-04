@@ -7,12 +7,14 @@ namespace Mchekhashvili\TaxLegislation;
 use Illuminate\Contracts\Bus\Dispatcher as Bus;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Contracts\Foundation\CachesRoutes;
 use Illuminate\Support\ServiceProvider;
 use Mchekhashvili\TaxLegislation\Contracts\Ledger;
 use Mchekhashvili\TaxLegislation\Engine\Tax;
 use Mchekhashvili\TaxLegislation\Engine\TaxEngine;
 use Mchekhashvili\TaxLegislation\Engine\TaxRegistry;
 use Mchekhashvili\TaxLegislation\Events\TaxableEventAssessed;
+use Mchekhashvili\TaxLegislation\Http\Routes;
 use Mchekhashvili\TaxLegislation\Ledger\NullLedger;
 use Mchekhashvili\TaxLegislation\Legislation\Law;
 use Mchekhashvili\TaxLegislation\Listeners\StoreAssessment;
@@ -60,6 +62,10 @@ final class TaxLegislationServiceProvider extends ServiceProvider
 
         if (config('tax-legislation.database.run_migrations')) {
             $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
+        }
+
+        if (config('tax-legislation.api.enabled') && !($this->app instanceof CachesRoutes && $this->app->routesAreCached())) {
+            Routes::register(config('tax-legislation.api'));
         }
 
         if ($this->app->runningInConsole()) {
