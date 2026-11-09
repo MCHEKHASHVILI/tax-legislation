@@ -62,6 +62,7 @@ it('reports a tax in force that no engine computes', function () {
     expect($before->for('social'))->toBeInstanceOf(NotComputed::class)
         ->and((string) $before->for('social'))->toBe('Not computed — Art. 1.social — Social tax: In force on this day, but no engine computes it.')
         ->and($before->for('sales'))->toBeInstanceOf(Taxable::class)
+        ->and($before->countryOf('social'))->toBe('AM')
         ->and($after->for('social'))->toBeNull();
 });
 

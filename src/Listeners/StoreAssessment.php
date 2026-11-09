@@ -23,12 +23,15 @@ final class StoreAssessment
 
         $assessment = Assessment::query()->create([
             'event_type' => $report->event::class,
+            'country' => $report->country(),
             'payload' => base64_encode(serialize($report->event)),
             'occurred_on' => $report->event->date(),
             'total_tax' => $report->totalTax(),
         ]);
 
-        $assessment->outcomes()->createMany($report->outcomes->map(self::row(...))->values()->all());
+        $assessment->outcomes()->createMany(
+            $report->outcomes->map(fn (Outcome $o) => ['country' => $report->countryOf($o->tax())] + self::row($o))->values()->all(),
+        );
     }
 
     /** @return array<string, mixed> */

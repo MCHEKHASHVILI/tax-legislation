@@ -110,7 +110,7 @@ abstract class Tax
     /** As a pipe of the engine. */
     final public function handle(TaxReport $report, Closure $next): TaxReport
     {
-        return $next($report->with($this->assess($report->event, $report)));
+        return $next($report->with($this->assess($report->event, $report), $this->country()));
     }
 
     /**

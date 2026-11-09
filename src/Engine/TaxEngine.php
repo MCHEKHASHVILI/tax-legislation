@@ -72,10 +72,10 @@ final readonly class TaxEngine
             ->through($taxes)
             ->thenReturn();
 
-        return array_reduce($uncomputed, fn (TaxReport $r, NotComputed $o) => $r->with($o), $report);
+        return array_reduce($uncomputed, fn (TaxReport $r, array $u) => $r->with(...$u), $report);
     }
 
-    /** @return array{0: list<Tax>, 1: list<NotComputed>} */
+    /** @return array{0: list<Tax>, 1: list<array{0: NotComputed, 1: string}>} outcome and country */
     private function inForce(TaxableEvent $event): array
     {
         if (!$this->container->make('config')->get('tax-legislation.follow_law', true)) {
@@ -97,7 +97,7 @@ final readonly class TaxEngine
 
             foreach ($recorded ?? [] as $code => $type) {
                 if ($type->engine === null || !class_exists($type->engine)) {
-                    $uncomputed[] = new NotComputed((string) $code, new Citation(preg_replace('/^Art\.\s*/', '', (string) $type->legal_basis), $type->nameIn('en')));
+                    $uncomputed[] = [new NotComputed((string) $code, new Citation(preg_replace('/^Art\.\s*/', '', (string) $type->legal_basis), $type->nameIn('en'))), (string) $country];
                 }
             }
         }

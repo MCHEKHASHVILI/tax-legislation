@@ -50,6 +50,18 @@ it('gives each country its own rates in one run', function () {
         ->and((string) $report->for('turnover')->amount)->toBe('50.00 AMD'); // a tax calling rateTable()
 });
 
+it('stores each outcome\'s country, and none on an assessment spanning two', function () {
+    $both = Taxes::process(($this->sale)(1000));
+    Taxes::forCountry('AM')->process(($this->sale)(1000));
+
+    $stored = \Mchekhashvili\TaxLegislation\Assessments\Models\Assessment::query()->with('outcomes')->orderBy('id')->get();
+
+    expect([$both->countryOf('sales'), $both->countryOf('turnover'), $both->country()])->toBe(['AM', 'AZ', null])
+        ->and($stored->pluck('country')->all())->toBe([null, 'AM'])
+        ->and($stored->first()->outcomes->pluck('country', 'tax')->all())->toBe(['sales' => 'AM', 'turnover' => 'AZ'])
+        ->and(\Mchekhashvili\TaxLegislation\Assessments\Models\Assessment::ofCountry('ARM')->count())->toBe(1);   // alpha-3, through Country
+});
+
 it('gives each country its own thresholds', function () {
     expect(Taxes::assess(($this->sale)(99))->for('turnover'))->toBeInstanceOf(NotTaxable::class)
         ->and(Taxes::forCountry('AM')->assess(($this->sale)(99))->for('sales')->rate->percent)->toBe(18.0);

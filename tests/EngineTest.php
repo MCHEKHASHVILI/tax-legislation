@@ -85,6 +85,31 @@ it('stores reports with their outcomes', function () {
         ->and((string) $outcome->base)->toBe('1000.00 AMD');
 });
 
+it('stores the country whose law assessed the event', function () {
+    $report = Taxes::process(($this->sale)(1000));
+
+    $assessment = Assessment::query()->with('outcomes')->sole();
+
+    expect($report->country())->toBe('AM')
+        ->and($report->countryOf('sales'))->toBe('AM')
+        ->and($report->toArray()['country'])->toBe('AM')
+        ->and($assessment->country)->toBe('AM')
+        ->and($assessment->outcomes->sole()->country)->toBe('AM')
+        ->and(Assessment::ofCountry('am')->count())->toBe(1)
+        ->and(Assessment::ofCountry('GE')->count())->toBe(0)
+        ->and(\Mchekhashvili\TaxLegislation\Assessments\Models\AssessedOutcome::ofCountry('AM')->count())->toBe(1);
+});
+
+it('knows no country for a report with no outcomes, or one built without them', function () {
+    $empty = Taxes::forCountry('GE')->assess(($this->sale)(1));
+    $bare = new TaxReport(($this->sale)(1), 'AMD', [new Exempt('sales', new \Mchekhashvili\TaxLegislation\Law\Citation('2'), 'Food.')]);
+
+    expect($empty->country())->toBeNull()
+        ->and($bare->countryOf('sales'))->toBeNull()
+        ->and($bare->country())->toBeNull()
+        ->and($bare->with($bare->for('sales'), 'am')->country())->toBe('AM');
+});
+
 it('narrows by country and by tax', function () {
     expect(Taxes::forCountry('am')->taxes()->keys()->all())->toBe(['sales'])
         ->and(Taxes::forCountry('GE')->taxes()->all())->toBe([])
