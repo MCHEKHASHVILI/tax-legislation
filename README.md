@@ -23,7 +23,7 @@ Until the packages are on Packagist, add their repositories to your app's `compo
 ```
 
 ```
-composer require mchekhashvili/money:^1.0@dev mchekhashvili/countries:^1.0@dev mchekhashvili/tax-legislation:dev-main
+composer require mchekhashvili/money:^1.0@dev mchekhashvili/countries:^1.0@dev mchekhashvili/tax-legislation:^1.0@dev
 php artisan migrate
 php artisan countries:sync
 ```
@@ -241,7 +241,7 @@ The engine depends on a few contracts, which a country implements:
 | `Taxpayer` | Whoever pays; an `id` |
 | `Ledger` | Records each processed event, for year-to-date thresholds |
 
-`TaxReport` is macroable, so a country adds the questions its law asks: Georgia adds `vatCharged()` and `netToRecipient()`.
+A `TaxReport` holds each tax's outcome (`$report->for('vat')`, `$report->outcomes`), the ones that charge money (`charges()`), and their sums (`amountOf('vat', 'excise')`, `totalTax()`). It is macroable, so a country adds the questions its law asks: Georgia adds `vatCharged()` and `netToRecipient()`.
 
 A report knows whose law gave each outcome: `$report->countryOf('vat')` is the tax's country (ISO 3166-1 alpha-2), and `$report->country()` is the one country of all its outcomes, or null when they span several. Processed reports are stored in `tax_assessments` and `tax_assessment_outcomes` (models in `Assessments\Models`), each with that `country`:
 
@@ -252,7 +252,14 @@ AssessedOutcome::ofCountry('GE')->where('tax', 'vat')->sum('amount');
 
 ## Config
 
-`php artisan vendor:publish --tag=tax-legislation-config` covers the tax list, the JSON API, pipeline overrides, whether reports are stored, the database connection and table prefix, and the queue.
+`php artisan vendor:publish --tag=tax-legislation-config` covers the tax list, following the recorded law (`follow_law`), approval (`approval.required`, `approval.gate`), the JSON API, pipeline overrides, whether reports are stored, the database connection and table prefix, and the queue.
+
+## Known limits
+
+Two things assume one country per app for now, and are on the roadmap:
+
+- The `Ledger` binding is global: a second country's taxes would record into, and read year-to-date totals from, the same ledger.
+- A report keys outcomes by tax name, and `totalTax()` sums in one currency. A report from an engine running two countries' taxes would let one country's `vat` overwrite the other's, and throw `CurrencyMismatch` when their currencies differ. Run one country at a time (`Taxes::forCountry('GE')`); stored outcomes already name their country.
 
 ## Tests
 
